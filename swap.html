@@ -1,0 +1,315 @@
+<!DOCTYPE HTML>
+<!--
+	Caminar by TEMPLATED
+	templated.co @templatedco
+	Released for free under the Creative Commons Attribution 3.0 license (templated.co/license)
+-->
+<html>
+	<head>
+		<title>Eva Emmerich</title>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<link rel="stylesheet" href="assets/css/main.css" />
+	</head>
+	<body>
+
+		<!-- Header -->
+			<header id="header">
+				<div class="logo"><a href="#">Eva Emmerich<span>Software Engineer, Hardware Hacker, and Ergonomic Keyboard designer</span></a></div>
+			</header>
+
+		<!-- Main -->
+			<section id="main">
+				<div class="inner">
+
+				<!-- One -->
+					<section id="one" class="wrapper style1">
+
+						<div class="content">
+
+<h1>swapfile vs swap partition vs zram vs zswap</h1>
+<p>this originally started as my research notes when deciding on a swap configuration for my nixos configuration, prawnix (<a href="https://github.com/SolidEva/prawnix">https://github.com/SolidEva/prawnix</a>)</p>
+<p>i last examined swap configurations when working on PrawnOS (<a href="https://github.com/SolidEva/PrawnOS">https://github.com/SolidEva/PrawnOS</a>). On PrawnOS, i really just picked zram without further thought because the ChromeOS devs used it for the same hardware. i wanted to give this decision a bit more thought.</p>
+<p>at then end, i want to have reasonable default swap configurations for the following types of systems i manage and encounter:</p>
+<ul>
+<li>desktops with powerful cpus, lots of memory (&gt;&gt;16GB), and persistent nvme SSD storage (&gt;1TB)</li>
+<li>laptops with powerful cpus, lots of memory (&gt;&gt;16GB), and persistent nvme SSD storage (&gt;1TB)</li>
+<li>laptops with weak cpus, minimal memory (~8GB or less), and persistent nvme SSD storage (~128GB)</li>
+<li>SBCs (like the rpi), weak cpus, minimal memory, and SD card persistent storage</li>
+<li>NAS server, moderate cpu, ~32GB memory, and persistent nvme SSD storage</li>
+</ul>
+<h2>What does linux use swap for</h2>
+<ul>
+<li>swapping from standard system memory to some other storage. yes, its good to have some form of swap, this post will not be a debate on whether swap should be used.<ul>
+<li>others have written plenty on why some form of swap is useful.</li>
+<li><a href="https://chrisdown.name/2018/01/02/in-defence-of-swap.html">https://chrisdown.name/2018/01/02/in-defence-of-swap.html</a></li>
+<li><a href="https://fedoraproject.org/wiki/Changes/SwapOnZRAM">https://fedoraproject.org/wiki/Changes/SwapOnZRAM</a></li>
+</ul>
+</li>
+<li>hibernate<ul>
+<li>linux borrows the swapfile/partition to store the ram contents to disk for hibernate</li>
+<li>this requires the swapfile/partition be &gt;= the size of the machines ram</li>
+<li>hibernate on linux is... complicated<ul>
+<li>many distros don't configure it by default (more on this below)</li>
+<li>it has security tradeoffs (also more on this below)</li>
+<li><a href="https://nixos.wiki/wiki/Hibernation">https://nixos.wiki/wiki/Hibernation</a></li>
+<li><a href="https://wiki.archlinux.org/title/Power_management/Suspend_and_hibernate#Hibernation">https://wiki.archlinux.org/title/Power_management/Suspend_and_hibernate#Hibernation</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h2>Types of swap</h2>
+<p><a href="https://wiki.nixos.org/wiki/Swap">https://wiki.nixos.org/wiki/Swap</a></p>
+<ul>
+<li>swap partition (lvm or normal partition)<ul>
+<li>define a partition to use as swap space</li>
+</ul>
+</li>
+<li>swapfile<ul>
+<li>define a file path on a filesystem to use as swap space</li>
+</ul>
+</li>
+<li>swap on zram (often referred to as just "zram"): <a href="https://fedoraproject.org/wiki/Changes/SwapOnZRAM">https://fedoraproject.org/wiki/Changes/SwapOnZRAM</a><ul>
+<li>use a ramdisk with compression as your swap device</li>
+</ul>
+</li>
+<li>zswap: <a href="https://wiki.archlinux.org/title/Zswap">https://wiki.archlinux.org/title/Zswap</a><ul>
+<li>use a ramdisk with compression as your first layer swap, then a swapfile or swap partition as your second layere swap</li>
+<li>yep, the solution to full/slow caches is always just to make another cache layer (or add more memory). welcome to memory management! its turtles all the way down</li>
+</ul>
+</li>
+</ul>
+<h2>hibernation on linux</h2>
+<h3>a short explanation of how hibernation works</h3>
+<ul>
+<li>hibernation is a "deep sleep" state, mainly useful for laptops</li>
+<li>hibernation is more power efficient than the usual suspend state, allowing the machine to stay asleep for very long periods of time</li>
+<li>to hibernate, the device dumps its ram contents to some form of persisitent storage (ssd, disk, etc) and powers off</li>
+<li>on "wake up" the device does a shortened boot sequence, reads the persisted memory contents, and loads them back into memory</li>
+<li>the user sees exactly what they were doing before hibernation was triggered, same as normal suspend</li>
+<li>more here <a href="https://en.wikipedia.org/wiki/Hibernation_(computing)">https://en.wikipedia.org/wiki/Hibernation_(computing)</a></li>
+</ul>
+<h3>why hibernation is good</h3>
+<ul>
+<li>its a super low power usage sleep, whats not to love! Everyone wants more battery life.</li>
+<li>less time spent watching the boot process!</li>
+</ul>
+<h3>why hibernation is complicated</h3>
+<h4>security</h4>
+<h5>rootfs encryption</h5>
+<ul>
+<li>i will assume that everyone already knows why an encrypted rootfs is a good thing to have.</li>
+<li>
+<p>so i will also assume that everyone already has an encrypted rootfs.</p>
+</li>
+<li>
+<p>What happens when your encryption keys get dumped to swap as part of hibernate? If your swap is unencrypted, the data one your system is vulnerable during hibernate!</p>
+<ul>
+<li>to fix this, swap must be encrypted!</li>
+</ul>
+</li>
+</ul>
+<h5>secure boot</h5>
+<ul>
+<li>using your own secure boot keys is a good security choice, and is part of a secure boot chain.</li>
+<li>part of secure boot is kernel lockdown mode, which introduces a number of restrictions to the system to prevent attackers side-stepping secure boot protections<ul>
+<li>one of these restrictions is disabling hibernate, because the kernel can't guarantee that the on disk contents haven't been modified</li>
+</ul>
+</li>
+<li>proper patch proposals have been made (and punted)<ul>
+<li><a href="https://wiki.debian.org/Hibernation">https://wiki.debian.org/Hibernation</a></li>
+<li><a href="https://lkml.iu.edu/hypermail/linux/kernel/1804.0/01607.html">https://lkml.iu.edu/hypermail/linux/kernel/1804.0/01607.html</a> (featuring angry Linus)</li>
+</ul>
+</li>
+<li>you can manually workaround this, but no one is vetting these setups for security so use at your own risk.<ul>
+<li><a href="https://discussion.fedoraproject.org/t/setup-hibernation-on-fedora-atomic-desktops/121534/7">https://discussion.fedoraproject.org/t/setup-hibernation-on-fedora-atomic-desktops/121534/7</a></li>
+<li><a href="https://community.frame.work/t/guide-fedora-36-hibernation-with-enabled-secure-boot-and-full-disk-encryption-fde-decrypting-over-tpm2/25474">https://community.frame.work/t/guide-fedora-36-hibernation-with-enabled-secure-boot-and-full-disk-encryption-fde-decrypting-over-tpm2/25474</a></li>
+</ul>
+</li>
+</ul>
+<h5>bad habits</h5>
+<ul>
+<li>leaving your machines unattended, in a powered on state for long periods is not great security practice. an encrypted system is most secure when powered off</li>
+</ul>
+<h4>hardware issues</h4>
+<ul>
+<li>nvidia gpus, as usual, might give you some trouble. seems like nvidia doesn't adequately test resuming from hibernate on linux :|<ul>
+<li><a href="https://forums.developer.nvidia.com/t/black-screen-with-cursor-after-sleep/319473/16">https://forums.developer.nvidia.com/t/black-screen-with-cursor-after-sleep/319473/16</a></li>
+<li><a href="https://forums.developer.nvidia.com/t/580-76-05-deadlock-on-hibernate-suspend-works/343517">https://forums.developer.nvidia.com/t/580-76-05-deadlock-on-hibernate-suspend-works/343517</a></li>
+<li><a href="https://github.com/NVIDIA/open-gpu-kernel-modules/issues/887">https://github.com/NVIDIA/open-gpu-kernel-modules/issues/887</a></li>
+<li>(and many more instances)</li>
+</ul>
+</li>
+</ul>
+<h4>Limited swap choices</h4>
+<ul>
+<li>if you use zram without a disk-based swap device, you cannot use hibernation since zram lives in ram. you now need two swap devices.<ul>
+<li>of course, you can use zswap.</li>
+</ul>
+</li>
+</ul>
+<h4>non trivial to setup</h4>
+<ul>
+<li>most distros don't provide a configuration with hibernation enabled by default, it is up to the user to figure it out.</li>
+</ul>
+<h4>many laptops already have great suspend</h4>
+<ul>
+<li>suspend "just works" out of the box on just about every laptop</li>
+<li>most laptops can get over a day of suspend on a single charge</li>
+<li>for most users, standard suspend is more than sufficient for their workflows. suspend just needs to last long enough to get between meetings/commuting/charging sessions.</li>
+</ul>
+<h3>so is hibernation worth it?</h3>
+<ul>
+<li><strong>obviously, most of this section is going to be opinion.</strong></li>
+<li>honestly, i don't think it is. i don't bother with it on any of my machines.</li>
+<li>if i had a machine with bad suspend, i might consider it.</li>
+<li>
+<p>if your workflow requires leaving your computer unused for a week, but shutting it down is <em>really bad</em> for some reason, hibernate might be worth it.</p>
+</li>
+<li>
+<p>looking at a couple more streamlined uses of linux:</p>
+<ul>
+<li>valve doesn't bother with hibernate for their steamdeck.</li>
+<li>but from what i can tell, google does seems to use hibernate on most chromebooks.</li>
+</ul>
+</li>
+</ul>
+<p>because of all of that, i won't be focusing much on hibernation when looking at the different swap setups. the focus of the comparison will be the resource constraints, security, and performance of each swap implementation</p>
+<h2>swapfile and swap partition</h2>
+<ul>
+<li>a swapfile and swap partition are very similar, so we will talk about them together</li>
+</ul>
+<h3>similarities</h3>
+<ul>
+<li>causes additional wear on persistent storage<ul>
+<li>this is especially bad on SD cards, but also impacts SSDs</li>
+</ul>
+</li>
+<li>can use up precious persistent storage space on systems with small ssds/sds/hdds/etc</li>
+<li>swapfiles and swap partitions have identical performance, because it skips all of the filesystem/cache layers. (the LUKS layer is not skipped, more on this later)<ul>
+<li>before ~2005 swapfile could be slower than swap partition</li>
+<li><a href="https://lkml.org/lkml/2005/7/7/326">https://lkml.org/lkml/2005/7/7/326</a></li>
+<li><a href="https://help.ubuntu.com/community/SwapFaq">https://help.ubuntu.com/community/SwapFaq</a></li>
+<li><a href="https://serverfault.com/questions/25653/swap-partition-vs-file-for-performance">https://serverfault.com/questions/25653/swap-partition-vs-file-for-performance</a></li>
+<li>seems the idea that swapfiles are inherently less performant than swap partitions was caused the before ~2005 times</li>
+<li>i looked for a bit and did not find any test data comparing swapfiles to swap partitions. if anyone has accurate modern data, i would be happy to see it.</li>
+</ul>
+</li>
+<li>generally less performant than zram or zswap. more on this later</li>
+<li>security<ul>
+<li>if use encryption, none of your memory contents are ever written unencrytped to persistent storage.</li>
+<li>if your swap partition, or the partition containing your swapfile, is not encrypted, your memory contents are written to persistent storage. This can be impossible to ever truly delete. Even with Secure Erase/Delete, data may be recoverable. Generally physical destruction is required to guarantee deletion.<ul>
+<li><a href="https://www.itc.rwth-aachen.de/cms/it-center/services/it-sicherheit/~bjajzw/datenvernichtung/?lidx=1">https://www.itc.rwth-aachen.de/cms/it-center/services/it-sicherheit/~bjajzw/datenvernichtung/?lidx=1</a></li>
+<li><a href="https://www.usenix.org/legacy/event/fast11/tech/full_papers/Wei.pdf">https://www.usenix.org/legacy/event/fast11/tech/full_papers/Wei.pdf</a></li>
+<li><a href="https://www.bsi.bund.de/EN/Themen/Verbraucherinnen-und-Verbraucher/Informationen-und-Empfehlungen/Cyber-Sicherheitsempfehlungen/Daten-sichern-verschluesseln-und-loeschen/Daten-endgueltig-loeschen/daten-endgueltig-loeschen.html">https://www.bsi.bund.de/EN/Themen/Verbraucherinnen-und-Verbraucher/Informationen-und-Empfehlungen/Cyber-Sicherheitsempfehlungen/Daten-sichern-verschluesseln-und-loeschen/Daten-endgueltig-loeschen/daten-endgueltig-loeschen.html</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h3>differences</h3>
+<h4>swapfile</h4>
+<ul>
+<li>trivial to configure after initial system setup</li>
+<li>trivial to resize</li>
+<li>not possible on some filesystems (ZFS, BcacheFS <a href="https://github.com/koverstreet/bcachefs/issues/368">https://github.com/koverstreet/bcachefs/issues/368</a>)</li>
+<li>requires some special handling on BTRFS (<a href="https://btrfs.readthedocs.io/en/latest/Swapfile.html">https://btrfs.readthedocs.io/en/latest/Swapfile.html</a>)</li>
+<li>possibly less tested than swap partitions<ul>
+<li>a 5.12 release candidate had a nasty bug affecting only swapfile users that was not caught by testing<ul>
+<li><a href="https://lwn.net/Articles/848265/">https://lwn.net/Articles/848265/</a></li>
+<li>contrary to what linus says, swapfiles actually seem to have been the default for non-lvm ubuntu installs for some time (not sure of the exact window)</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h4>swap parititon</h4>
+<ul>
+<li>annoying to resize if you aren't using LVM</li>
+<li>hard to create after initial system setup if you aren't using LVM</li>
+</ul>
+<h2>swap on zram</h2>
+<ul>
+<li>compressing/decompressing the data is significantly faster than read/writing from persistent storage, even on slow/older cpus.<ul>
+<li>effectively gives you more ram at the cost of extremely-extremely minor CPU usage.</li>
+</ul>
+</li>
+<li>good for systems with sd cards as it doesn't contribute to sd card wear</li>
+<li>your memory contents never touch persistent storage, so no security risk on unencrypted systems</li>
+<li>some notes on zram configuration:<ul>
+<li><a href="https://notes.xeome.dev/notes/Zram">https://notes.xeome.dev/notes/Zram</a></li>
+</ul>
+</li>
+</ul>
+<h2>zswap</h2>
+<ul>
+<li><a href="https://www.kernel.org/doc/html/latest/admin-guide/mm/zswap.html">https://www.kernel.org/doc/html/latest/admin-guide/mm/zswap.html</a></li>
+<li>provides the advantages of zram, while allowing additional swap space for extremely infrequently used pages</li>
+<li>security concerns of traditional swapfile/swap partition apply, if you don't use encryption, your memory content end up readable from your persistent storage device</li>
+<li>does incur more wear on your persistent storage than zram, but much less than traditional swapfiles/swap partitions<ul>
+<li>might not be worth it on systems using SD cards</li>
+</ul>
+</li>
+<li>allows for more swap room than zram when necessary, both by expanding the in ram compressed cache, and by offloading to a compressed swapfile/swappartition</li>
+<li>expands the in ram compressed cache when necessary, vs zram which has a static in-ram cache size</li>
+<li>causes additional wear on persistent storage<ul>
+<li>this is especially bad on SD cards, but also impacts SSDs</li>
+</ul>
+</li>
+<li>can use up precious persistent storage space on systems with small ssds/sds/hdds/etc</li>
+</ul>
+<h1>final configurations</h1>
+<ul>
+<li>late into writing this, i found <a href="https://linuxblog.io/zswap-better-than-zram/">https://linuxblog.io/zswap-better-than-zram/</a> which is an amazing writeup comparting zswap and zram with <em>data</em>!. my final configurations are heavily informed by that post.</li>
+</ul>
+<p>For the following configurations:</p>
+<ul>
+<li>desktops with powerful cpus, lots of memory (&gt;&gt;16GB), and persistent nvme SSD storage (&gt;1TB)</li>
+<li>laptops with powerful cpus, lots of memory (&gt;&gt;16GB), and persistent nvme SSD storage (&gt;1TB)</li>
+<li>laptops with weak cpus, minimal memory (~8GB or less), and persistent nvme SSD storage (~128GB)</li>
+<li>NAS server, moderate cpu, ~32GB memory, and persistent nvme SSD storage</li>
+</ul>
+<p>i settled on the following zswap configuration:</p>
+<p><code>"zswap.enabled=1" # enables zswap
+"zswap.compressor=zstd" # compression algorithm
+"zswap.max_pool_percent=20" # maximum percentage of RAM that zswap is allowed to use
+"zswap.shrinker_enabled=1" # whether to shrink the pool proactively on high memory pressure</code></p>
+<p>and combined it with a 16GB swapfile on my rootfs, which means its automatically encrypted.</p>
+<p>nixos config example here: <a href="https://github.com/SolidEva/prawnix/blob/main/modules/swap/zram.nix">https://github.com/SolidEva/prawnix/blob/main/modules/swap/zswap.nix</a></p>
+<p>Some rationale:
+zstd seems to be the best compromise between compression speed and ratio for this use case. lzo and lz4 are both faster than zstd, but zstd gets much better compression ratios. the more we can compress, the more we can fit in the zswap pool and the faster we can copy the swapped data. there isn't a lot of data available comparing the compression algos for this tasks unfortunately.
+enabling the shrinker seems to be better at punting cold pages to persistent storage according to <a href="https://github.com/torvalds/linux/commit/b5ba474f3f518701249598b35c581b92a3c95b48">https://github.com/torvalds/linux/commit/b5ba474f3f518701249598b35c581b92a3c95b48</a>
+which is nice for things like browser pages</p>
+<p>For the last configuration:</p>
+<ul>
+<li>SBCs (like the rpi), weak cpus, minimal memory, and SD card persistent storage</li>
+</ul>
+<p>i settled on using the following zram configuration:</p>
+<p><code>ALGO=zstd
+PERCENTAGE=30</code></p>
+<p>nixos config example here: <a href="https://github.com/SolidEva/prawnix/blob/main/modules/swap/zram.nix">https://github.com/SolidEva/prawnix/blob/main/modules/swap/zram.nix</a></p>
+
+
+						</div>
+					</section>
+				</div>
+			</section>
+
+		<!-- Footer -->
+			<footer id="footer">
+				  <div class="copyright">
+					    This page is licensed under <a href="https://creativecommons.org/licenses/by-sa/4.0/">Creative Commons BY-SA 4.0</a> Spread Free Culture!<br>
+              Modified template from <a href="https://templated.co/">TEMPLATED</a>
+				  </div>
+			</footer>
+
+		<!-- Scripts -->
+			<!-- <script src="assets/js/jquery.min.js"></script> -->
+			<!-- <script src="assets/js/jquery.poptrox.min.js"></script> -->
+			<!-- <script src="assets/js/skel.min.js"></script> -->
+			<!-- <script src="assets/js/util.js"></script> -->
+			<!-- <script src="assets/js/main.js"></script> -->
+
+	</body>
+</html>
