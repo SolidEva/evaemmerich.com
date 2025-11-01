@@ -29,6 +29,7 @@
 
 <h1>swapfile vs swap partition vs zram vs zswap</h1>
 <p>this originally started as my research notes when deciding on a swap configuration for my nixos configuration, prawnix (<a href="https://github.com/SolidEva/prawnix">https://github.com/SolidEva/prawnix</a>)</p>
+<p>sorry for the weird list formatting, you can blame <a href="https://pypi.org/project/Markdown/">https://pypi.org/project/Markdown/</a></p>
 <p>i last examined swap configurations when working on PrawnOS (<a href="https://github.com/SolidEva/PrawnOS">https://github.com/SolidEva/PrawnOS</a>). On PrawnOS, i really just picked zram without further thought because the ChromeOS devs used it for the same hardware. i wanted to give this decision a bit more thought.</p>
 <p>at then end, i want to have reasonable default swap configurations for the following types of systems i manage and encounter:</p>
 <ul>
@@ -40,8 +41,8 @@
 </ul>
 <h2>What does linux use swap for</h2>
 <ul>
-<li>swapping from standard system memory to some other storage. yes, its good to have some form of swap, this post will not be a debate on whether swap should be used.<ul>
-<li>others have written plenty on why some form of swap is useful.</li>
+<li>moving pages from standard system memory to some other storage. yes, its good to have some form of swap, this post will not be a debate on whether swap should be used.<ul>
+<li>for more information on swap, and why some form of swap is useful.</li>
 <li><a href="https://chrisdown.name/2018/01/02/in-defence-of-swap.html">https://chrisdown.name/2018/01/02/in-defence-of-swap.html</a></li>
 <li><a href="https://fedoraproject.org/wiki/Changes/SwapOnZRAM">https://fedoraproject.org/wiki/Changes/SwapOnZRAM</a></li>
 </ul>
@@ -63,11 +64,11 @@
 <p><a href="https://wiki.nixos.org/wiki/Swap">https://wiki.nixos.org/wiki/Swap</a></p>
 <ul>
 <li>swap partition (lvm or normal partition)<ul>
-<li>define a partition to use as swap space</li>
+<li>defines a partition to use as swap space</li>
 </ul>
 </li>
 <li>swapfile<ul>
-<li>define a file path on a filesystem to use as swap space</li>
+<li>defines a file path on a filesystem to use as swap space</li>
 </ul>
 </li>
 <li>swap on zram (often referred to as just "zram"): <a href="https://fedoraproject.org/wiki/Changes/SwapOnZRAM">https://fedoraproject.org/wiki/Changes/SwapOnZRAM</a><ul>
@@ -75,7 +76,7 @@
 </ul>
 </li>
 <li>zswap: <a href="https://wiki.archlinux.org/title/Zswap">https://wiki.archlinux.org/title/Zswap</a><ul>
-<li>use a ramdisk with compression as your first layer swap, then a swapfile or swap partition as your second layere swap</li>
+<li>use a ramdisk with compression as your first layer swap, then a swapfile or swap partition as your second layer swap</li>
 <li>yep, the solution to full/slow caches is always just to make another cache layer (or add more memory). welcome to memory management! its turtles all the way down</li>
 </ul>
 </li>
@@ -145,7 +146,7 @@
 <h4>Limited swap choices</h4>
 <ul>
 <li>if you use zram without a disk-based swap device, you cannot use hibernation since zram lives in ram. you now need two swap devices.<ul>
-<li>of course, you can use zswap.</li>
+<li>of course, you can use zswap instead</li>
 </ul>
 </li>
 </ul>
@@ -171,7 +172,7 @@
 <p>looking at a couple more streamlined uses of linux:</p>
 <ul>
 <li>valve doesn't bother with hibernate for their steamdeck.</li>
-<li>but from what i can tell, google does seems to use hibernate on most chromebooks.</li>
+<li>from what i can tell, google does seems to use hibernate on most chromebooks.</li>
 </ul>
 </li>
 </ul>
@@ -198,7 +199,7 @@
 </li>
 <li>generally less performant than zram or zswap. more on this later</li>
 <li>security<ul>
-<li>if use encryption, none of your memory contents are ever written unencrytped to persistent storage.</li>
+<li>if using encryption, none of your memory contents are ever written unencrytped to persistent storage.</li>
 <li>if your swap partition, or the partition containing your swapfile, is not encrypted, your memory contents are written to persistent storage. This can be impossible to ever truly delete. Even with Secure Erase/Delete, data may be recoverable. Generally physical destruction is required to guarantee deletion.<ul>
 <li><a href="https://www.itc.rwth-aachen.de/cms/it-center/services/it-sicherheit/~bjajzw/datenvernichtung/?lidx=1">https://www.itc.rwth-aachen.de/cms/it-center/services/it-sicherheit/~bjajzw/datenvernichtung/?lidx=1</a></li>
 <li><a href="https://www.usenix.org/legacy/event/fast11/tech/full_papers/Wei.pdf">https://www.usenix.org/legacy/event/fast11/tech/full_papers/Wei.pdf</a></li>
